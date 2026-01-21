@@ -6,9 +6,3 @@
 ## 文档
 
 - [APP 设计方案](docs/app_design.md)
-
-## Android 开发
-
-```bash
-./gradlew :app:assembleDebug
-```

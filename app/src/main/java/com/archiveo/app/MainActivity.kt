@@ -1,4 +1,4 @@
-package com.archiveo.app
+﻿package com.archiveo.app
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -18,11 +18,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Article
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Button
@@ -35,14 +37,22 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberTopAppBarState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -56,6 +66,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
+import java.util.UUID
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,14 +85,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 }
-
-private data class ArticleCard(
-    val id: String,
-    val title: String,
-    val category: String,
-    val keywords: List<String>,
-    val time: String,
-)
 
 private data class OutlineNode(
     val heading: String,
@@ -96,203 +104,63 @@ private data class SourceItem(
     val meta: String? = null,
 )
 
-private data class ArticleDetail(
+private data class Article(
     val id: String,
     val title: String,
     val category: String,
     val keywords: List<String>,
-    val time: String,
+    val createdAt: LocalDateTime,
     val outline: List<OutlineNode>,
     val mindmap: MindmapNode,
     val sources: List<SourceItem>,
 )
 
-private val sampleArticles = listOf(
-    ArticleCard(
-        id = "a1",
-        title = "AI 总结驱动的知识归档方法",
-        category = "知识管理",
-        keywords = listOf("摘要", "结构化", "检索"),
-        time = "今天",
-    ),
-    ArticleCard(
-        id = "a2",
-        title = "产品复盘：如何减少信息噪音",
-        category = "产品思考",
-        keywords = listOf("复盘", "信号", "流程"),
-        time = "昨天",
-    ),
-    ArticleCard(
-        id = "a3",
-        title = "读书笔记：系统化学习的三步",
-        category = "学习",
-        keywords = listOf("大纲", "知识库", "输出"),
-        time = "2 天前",
-    ),
+private enum class InputType(val label: String) {
+    Link("链接"),
+    Text("文本"),
+    Image("图片"),
+}
+
+private data class NewEntryInput(
+    val type: InputType,
+    val content: String,
+    val language: String,
+    val summaryLength: String,
+    val ocrEnabled: Boolean,
+    val imageCount: Int,
 )
 
-private val sampleDetails = listOf(
-    ArticleDetail(
-        id = "a1",
-        title = "AI 总结驱动的知识归档方法",
-        category = "知识管理",
-        keywords = listOf("摘要", "结构化", "检索", "信息整理", "归档"),
-        time = "今天 · 10:24",
-        outline = listOf(
-            OutlineNode(
-                heading = "问题与目标",
-                points = listOf("信息来源碎片化", "需要长期可检索的归档"),
-            ),
-            OutlineNode(
-                heading = "核心流程",
-                points = listOf("输入 → AI 理解 → 结构化 → 文章化"),
-                children = listOf(
-                    OutlineNode(
-                        heading = "输入层",
-                        points = listOf("链接、文本、图片", "保留原始来源"),
-                    ),
-                    OutlineNode(
-                        heading = "输出层",
-                        points = listOf("标题、关键词、大纲、思维导图"),
-                    ),
-                ),
-            ),
-            OutlineNode(
-                heading = "落地建议",
-                points = listOf("MVP 先做文本输入", "逐步补全导入导出"),
-            ),
-        ),
-        mindmap = MindmapNode(
-            text = "知识归档",
-            children = listOf(
-                MindmapNode(
-                    text = "输入",
-                    children = listOf(
-                        MindmapNode(text = "链接"),
-                        MindmapNode(text = "文本"),
-                        MindmapNode(text = "图片"),
-                    ),
-                ),
-                MindmapNode(
-                    text = "AI 处理",
-                    children = listOf(
-                        MindmapNode(text = "提炼主题"),
-                        MindmapNode(text = "组织结构"),
-                        MindmapNode(text = "生成摘要"),
-                    ),
-                ),
-                MindmapNode(
-                    text = "归档输出",
-                    children = listOf(
-                        MindmapNode(text = "文章"),
-                        MindmapNode(text = "标签/分类"),
-                    ),
-                ),
-            ),
-        ),
-        sources = listOf(
-            SourceItem(
-                type = "链接",
-                title = "原始网页",
-                body = "https://example.com/knowledge-archive",
-                meta = "抓取时间：今天 10:20",
-            ),
-            SourceItem(
-                type = "文本",
-                title = "粘贴文本",
-                body = "整理知识的关键在于保留来源，形成可复用的文章结构。",
-            ),
-            SourceItem(
-                type = "图片",
-                title = "会议白板照片",
-                body = "已生成图片描述：白板包含三步流程与重点标注。",
-                meta = "OCR：未开启",
-            ),
-        ),
-    ),
-    ArticleDetail(
-        id = "a2",
-        title = "产品复盘：如何减少信息噪音",
-        category = "产品思考",
-        keywords = listOf("复盘", "信号", "流程", "决策", "沉淀"),
-        time = "昨天 · 18:40",
-        outline = listOf(
-            OutlineNode(
-                heading = "复盘背景",
-                points = listOf("信息过载导致决策延迟", "团队需要共识"),
-            ),
-            OutlineNode(
-                heading = "三步流程",
-                points = listOf("收集事实", "过滤噪音", "沉淀原则"),
-            ),
-            OutlineNode(
-                heading = "实践建议",
-                points = listOf("每周定期复盘", "复盘结果进入知识库"),
-            ),
-        ),
-        mindmap = MindmapNode(
-            text = "信息噪音",
-            children = listOf(
-                MindmapNode(text = "问题"),
-                MindmapNode(text = "过滤策略"),
-                MindmapNode(text = "复盘输出"),
-            ),
-        ),
-        sources = listOf(
-            SourceItem(
-                type = "文本",
-                title = "复盘记录",
-                body = "本周新增需求较多，需要聚焦核心指标。",
-            ),
-            SourceItem(
-                type = "链接",
-                title = "参考资料",
-                body = "https://example.com/product-review",
-                meta = "抓取时间：昨天 18:20",
-            ),
-        ),
-    ),
-    ArticleDetail(
-        id = "a3",
-        title = "读书笔记：系统化学习的三步",
-        category = "学习",
-        keywords = listOf("大纲", "知识库", "输出", "复盘"),
-        time = "2 天前 · 21:15",
-        outline = listOf(
-            OutlineNode(
-                heading = "建立体系",
-                points = listOf("定义学习目标", "拆解知识模块"),
-            ),
-            OutlineNode(
-                heading = "高效输入",
-                points = listOf("做笔记", "及时归档"),
-            ),
-            OutlineNode(
-                heading = "输出复盘",
-                points = listOf("总结文章", "形成长期记忆"),
-            ),
-        ),
-        mindmap = MindmapNode(
-            text = "系统化学习",
-            children = listOf(
-                MindmapNode(text = "体系"),
-                MindmapNode(text = "输入"),
-                MindmapNode(text = "输出"),
-            ),
-        ),
-        sources = listOf(
-            SourceItem(
-                type = "文本",
-                title = "书籍摘要",
-                body = "系统化学习强调从目标出发，持续输出。",
-            ),
-        ),
-    ),
-)
+private class ArchiveoState(
+    val articles: SnapshotStateList<Article>,
+) {
+    fun addArticle(input: NewEntryInput): Article {
+        val article = Article(
+            id = UUID.randomUUID().toString().take(8),
+            title = buildTitle(input),
+            category = "未分类",
+            keywords = buildKeywords(input),
+            createdAt = LocalDateTime.now(),
+            outline = buildOutline(input),
+            mindmap = buildMindmap(input),
+            sources = buildSources(input),
+        )
+        articles.add(0, article)
+        return article
+    }
+
+    fun findById(id: String): Article? = articles.firstOrNull { it.id == id }
+}
+
+@Composable
+private fun rememberArchiveoState(): ArchiveoState {
+    val articles = remember { mutableStateListOf<Article>().apply { addAll(seedArticles()) } }
+    return remember { ArchiveoState(articles) }
+}
 
 @Composable
 private fun ArchiveoApp() {
     val navController = rememberNavController()
+    val appState = rememberArchiveoState()
     val items = listOf(
         BottomNavItem("home", "首页", Icons.Default.Article),
         BottomNavItem("new", "新建", Icons.Default.Add),
@@ -332,15 +200,28 @@ private fun ArchiveoApp() {
             modifier = Modifier.padding(padding),
         ) {
             composable("home") {
-                HomeScreen(onArticleSelected = { articleId ->
-                    navController.navigate("detail/$articleId")
-                })
+                HomeScreen(
+                    articles = appState.articles,
+                    onArticleSelected = { articleId ->
+                        navController.navigate("detail/$articleId")
+                    },
+                )
             }
-            composable("new") { NewEntryScreen() }
+            composable("new") {
+                NewEntryScreen(
+                    onGenerate = { input -> appState.addArticle(input) },
+                    onArticleGenerated = { articleId ->
+                        navController.navigate("detail/$articleId")
+                    },
+                )
+            }
             composable("search") {
-                SearchScreen(onArticleSelected = { articleId ->
-                    navController.navigate("detail/$articleId")
-                })
+                SearchScreen(
+                    articles = appState.articles,
+                    onArticleSelected = { articleId ->
+                        navController.navigate("detail/$articleId")
+                    },
+                )
             }
             composable("settings") { SettingsScreen() }
             composable(
@@ -348,7 +229,7 @@ private fun ArchiveoApp() {
                 arguments = listOf(navArgument("articleId") { defaultValue = "" }),
             ) { entry ->
                 val articleId = entry.arguments?.getString("articleId").orEmpty()
-                val detail = sampleDetails.firstOrNull { it.id == articleId } ?: sampleDetails.first()
+                val detail = appState.findById(articleId) ?: appState.articles.first()
                 ArticleDetailScreen(
                     detail = detail,
                     onBack = { navController.popBackStack() },
@@ -377,7 +258,7 @@ private fun ArchiveoTopBar() {
 }
 
 @Composable
-private fun HomeScreen(onArticleSelected: (String) -> Unit) {
+private fun HomeScreen(articles: List<Article>, onArticleSelected: (String) -> Unit) {
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -389,14 +270,14 @@ private fun HomeScreen(onArticleSelected: (String) -> Unit) {
                 fontWeight = FontWeight.SemiBold,
             )
         }
-        items(sampleArticles) { article ->
+        items(articles) { article ->
             ArticleCardItem(article, onClick = { onArticleSelected(article.id) })
         }
     }
 }
 
 @Composable
-private fun ArticleCardItem(article: ArticleCard, onClick: (() -> Unit)? = null) {
+private fun ArticleCardItem(article: Article, onClick: (() -> Unit)? = null) {
     Card(
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
         shape = RoundedCornerShape(16.dp),
@@ -416,13 +297,12 @@ private fun ArticleCardItem(article: ArticleCard, onClick: (() -> Unit)? = null)
             Row(verticalAlignment = Alignment.CenterVertically) {
                 TagChip(article.category, background = MaterialTheme.colorScheme.primaryContainer)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text(text = article.time, style = MaterialTheme.typography.bodySmall)
+                Text(text = formatTime(article.createdAt), style = MaterialTheme.typography.bodySmall)
             }
             Spacer(modifier = Modifier.height(8.dp))
-            Row {
-                article.keywords.forEach { keyword ->
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                article.keywords.take(4).forEach { keyword ->
                     TagChip(keyword)
-                    Spacer(modifier = Modifier.width(6.dp))
                 }
             }
         }
@@ -441,9 +321,38 @@ private fun TagChip(text: String, background: Color = MaterialTheme.colorScheme.
 }
 
 @Composable
-private fun NewEntryScreen() {
-    val options = listOf("链接", "文本", "图片")
-    val (selected, setSelected) = remember { mutableStateOf(options.first()) }
+private fun NewEntryScreen(
+    onGenerate: (NewEntryInput) -> Article,
+    onArticleGenerated: (String) -> Unit,
+) {
+    val inputTypes = InputType.values().toList()
+    var selectedType by remember { mutableStateOf(InputType.Text) }
+    var textInput by remember { mutableStateOf("") }
+    var linkInput by remember { mutableStateOf("") }
+    val images = remember { mutableStateListOf<String>() }
+
+    val languageOptions = listOf("自动", "中文", "英文")
+    val summaryOptions = listOf("短", "中", "长")
+    var languageIndex by remember { mutableStateOf(0) }
+    var summaryIndex by remember { mutableStateOf(1) }
+    var ocrEnabled by remember { mutableStateOf(false) }
+
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isGenerating by remember { mutableStateOf(false) }
+    var stepIndex by remember { mutableStateOf<Int?>(null) }
+    val scope = rememberCoroutineScope()
+
+    fun currentContent(): String = when (selectedType) {
+        InputType.Text -> textInput
+        InputType.Link -> linkInput
+        InputType.Image -> images.joinToString("\n")
+    }
+
+    val placeholder = when (selectedType) {
+        InputType.Text -> "在此粘贴文本或笔记段落"
+        InputType.Link -> "每行一个链接，例如 https://example.com"
+        InputType.Image -> "已选择图片：${images.size} 张"
+    }
 
     Column(
         modifier = Modifier
@@ -457,10 +366,10 @@ private fun NewEntryScreen() {
             fontWeight = FontWeight.SemiBold,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            options.forEach { option ->
-                val selectedState = selected == option
+            inputTypes.forEach { option ->
+                val selectedState = selectedType == option
                 Button(
-                    onClick = { setSelected(option) },
+                    onClick = { selectedType = option },
                     colors = ButtonDefaults.buttonColors(
                         containerColor = if (selectedState) {
                             MaterialTheme.colorScheme.primary
@@ -470,7 +379,7 @@ private fun NewEntryScreen() {
                     ),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp),
                 ) {
-                    Text(option)
+                    Text(option.label)
                 }
             }
         }
@@ -483,61 +392,163 @@ private fun NewEntryScreen() {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("输入内容", fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(140.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(12.dp),
-                        )
-                        .padding(12.dp),
-                ) {
+                if (selectedType == InputType.Image) {
+                    ImagePickerCard(images)
+                } else {
+                    OutlinedTextField(
+                        value = currentContent(),
+                        onValueChange = { value ->
+                            if (selectedType == InputType.Text) {
+                                textInput = value
+                            } else {
+                                linkInput = value
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(140.dp),
+                        placeholder = { Text(placeholder) },
+                        isError = errorMessage != null,
+                    )
+                }
+                if (selectedType == InputType.Image) {
                     Text(
-                        text = "在此粘贴文本、输入链接或上传图片",
+                        text = placeholder,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                }
+                errorMessage?.let { message ->
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(message, color = MaterialTheme.colorScheme.error)
                 }
                 Spacer(modifier = Modifier.height(12.dp))
                 Text("高级选项", fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                    OptionRow("语言识别", "自动")
-                    OptionRow("摘要长度", "中")
-                    OptionRow("图片 OCR", "关闭")
+                    OptionSelectorRow(
+                        label = "语言识别",
+                        value = languageOptions[languageIndex],
+                        onClick = { languageIndex = (languageIndex + 1) % languageOptions.size },
+                    )
+                    OptionSelectorRow(
+                        label = "摘要长度",
+                        value = summaryOptions[summaryIndex],
+                        onClick = { summaryIndex = (summaryIndex + 1) % summaryOptions.size },
+                    )
+                    OptionSelectorRow(
+                        label = "图片 OCR",
+                        value = if (ocrEnabled) "开启" else "关闭",
+                        onClick = { ocrEnabled = !ocrEnabled },
+                        enabled = selectedType == InputType.Image,
+                    )
                 }
             }
         }
 
         Button(
-            onClick = {},
+            onClick = {
+                val content = currentContent().trim()
+                val hasInput = when (selectedType) {
+                    InputType.Image -> images.isNotEmpty()
+                    else -> content.isNotBlank()
+                }
+                if (!hasInput) {
+                    errorMessage = "请先输入内容"
+                    return@Button
+                }
+                errorMessage = null
+                if (isGenerating) return@Button
+                scope.launch {
+                    isGenerating = true
+                    val steps = listOf("提取", "理解", "组织", "生成")
+                    steps.forEachIndexed { index, _ ->
+                        stepIndex = index
+                        delay(320)
+                    }
+                    val article = onGenerate(
+                        NewEntryInput(
+                            type = selectedType,
+                            content = content,
+                            language = languageOptions[languageIndex],
+                            summaryLength = summaryOptions[summaryIndex],
+                            ocrEnabled = ocrEnabled,
+                            imageCount = images.size,
+                        ),
+                    )
+                    isGenerating = false
+                    stepIndex = null
+                    onArticleGenerated(article.id)
+                }
+            },
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(12.dp),
+            enabled = !isGenerating,
         ) {
             Icon(Icons.Default.Article, contentDescription = null, modifier = Modifier.size(18.dp))
             Spacer(modifier = Modifier.width(8.dp))
-            Text("生成文章")
+            Text(if (isGenerating) "生成中..." else "生成文章")
         }
 
-        ProgressStepRow()
+        ProgressStepRow(stepIndex = stepIndex)
     }
 }
 
 @Composable
-private fun OptionRow(label: String, value: String) {
+private fun ImagePickerCard(images: SnapshotStateList<String>) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .height(140.dp)
+            .background(
+                color = MaterialTheme.colorScheme.surface,
+                shape = RoundedCornerShape(12.dp),
+            )
+            .padding(12.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Default.Image, contentDescription = null)
+            Spacer(modifier = Modifier.width(8.dp))
+            Text("图片输入", fontWeight = FontWeight.SemiBold)
+        }
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            items(images) { image ->
+                TagChip(image, background = MaterialTheme.colorScheme.secondaryContainer)
+            }
+        }
+        OutlinedButton(
+            onClick = { images.add("图片 ${images.size + 1}") },
+            shape = RoundedCornerShape(10.dp),
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(16.dp))
+            Spacer(modifier = Modifier.width(6.dp))
+            Text("模拟添加图片")
+        }
+    }
+}
+
+@Composable
+private fun OptionSelectorRow(
+    label: String,
+    value: String,
+    onClick: () -> Unit,
+    enabled: Boolean = true,
+) {
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(label, style = MaterialTheme.typography.bodySmall)
-        Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        TextButton(onClick = onClick, enabled = enabled) {
+            Text(value, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold)
+        }
     }
 }
 
 @Composable
-private fun ProgressStepRow() {
+private fun ProgressStepRow(stepIndex: Int?) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -550,13 +561,19 @@ private fun ProgressStepRow() {
         Text("生成进度", fontWeight = FontWeight.SemiBold)
         Spacer(modifier = Modifier.height(8.dp))
         Row(horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-            listOf("提取", "理解", "组织", "生成").forEach { step ->
+            val steps = listOf("提取", "理解", "组织", "生成")
+            steps.forEachIndexed { index, step ->
+                val active = stepIndex != null && index <= stepIndex
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Box(
                         modifier = Modifier
                             .size(36.dp)
                             .background(
-                                color = MaterialTheme.colorScheme.primaryContainer,
+                                color = if (active) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                },
                                 shape = RoundedCornerShape(12.dp),
                             ),
                         contentAlignment = Alignment.Center,
@@ -572,7 +589,18 @@ private fun ProgressStepRow() {
 }
 
 @Composable
-private fun SearchScreen(onArticleSelected: (String) -> Unit) {
+private fun SearchScreen(articles: List<Article>, onArticleSelected: (String) -> Unit) {
+    var query by remember { mutableStateOf("") }
+    val results = if (query.isBlank()) {
+        articles
+    } else {
+        articles.filter { article ->
+            article.title.contains(query, ignoreCase = true) ||
+                article.category.contains(query, ignoreCase = true) ||
+                article.keywords.any { it.contains(query, ignoreCase = true) }
+        }
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -592,19 +620,12 @@ private fun SearchScreen(onArticleSelected: (String) -> Unit) {
             Column(modifier = Modifier.padding(16.dp)) {
                 Text("关键词 / 全文", fontWeight = FontWeight.SemiBold)
                 Spacer(modifier = Modifier.height(8.dp))
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .background(
-                            color = MaterialTheme.colorScheme.surface,
-                            shape = RoundedCornerShape(12.dp),
-                        )
-                        .padding(horizontal = 12.dp),
-                    contentAlignment = Alignment.CenterStart,
-                ) {
-                    Text("输入搜索词…", style = MaterialTheme.typography.bodySmall)
-                }
+                OutlinedTextField(
+                    value = query,
+                    onValueChange = { query = it },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { Text("输入搜索词") },
+                )
                 Spacer(modifier = Modifier.height(12.dp))
                 HorizontalDivider()
                 Spacer(modifier = Modifier.height(12.dp))
@@ -617,8 +638,8 @@ private fun SearchScreen(onArticleSelected: (String) -> Unit) {
                 }
             }
         }
-        Text("搜索结果", fontWeight = FontWeight.SemiBold)
-        sampleArticles.forEach { article ->
+        Text("搜索结果 · ${results.size}", fontWeight = FontWeight.SemiBold)
+        results.forEach { article ->
             ArticleCardItem(article, onClick = { onArticleSelected(article.id) })
         }
     }
@@ -668,9 +689,9 @@ private fun SettingsCard(title: String, description: String) {
 }
 
 @Composable
-private fun ArticleDetailScreen(detail: ArticleDetail, onBack: () -> Unit) {
+private fun ArticleDetailScreen(detail: Article, onBack: () -> Unit) {
     val tabs = listOf("大纲", "思维导图", "源内容")
-    val (selectedTab, setSelectedTab) = remember { mutableStateOf(tabs.first()) }
+    var selectedTab by remember { mutableStateOf(tabs.first()) }
 
     LazyColumn(
         contentPadding = PaddingValues(16.dp),
@@ -705,7 +726,7 @@ private fun ArticleDetailScreen(detail: ArticleDetail, onBack: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         TagChip(detail.category, background = MaterialTheme.colorScheme.primaryContainer)
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(detail.time, style = MaterialTheme.typography.bodySmall)
+                        Text(formatTime(detail.createdAt), style = MaterialTheme.typography.bodySmall)
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -721,7 +742,7 @@ private fun ArticleDetailScreen(detail: ArticleDetail, onBack: () -> Unit) {
                 tabs.forEach { tab ->
                     val selected = tab == selectedTab
                     Button(
-                        onClick = { setSelectedTab(tab) },
+                        onClick = { selectedTab = tab },
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (selected) {
                                 MaterialTheme.colorScheme.primary
@@ -768,7 +789,7 @@ private fun OutlineCard(node: OutlineNode, depth: Int) {
             Spacer(modifier = Modifier.height(6.dp))
             node.points.forEach { point ->
                 Row(verticalAlignment = Alignment.Top) {
-                    Text("•", fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
+                    Text("-", fontSize = 12.sp, modifier = Modifier.padding(top = 2.dp))
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(point, style = MaterialTheme.typography.bodySmall)
                 }
@@ -843,4 +864,286 @@ private fun ArchiveoTheme(content: @Composable () -> Unit) {
         typography = MaterialTheme.typography,
         content = content,
     )
+}
+
+private fun seedArticles(): List<Article> {
+    val now = LocalDateTime.now()
+    return listOf(
+        Article(
+            id = "a1",
+            title = "AI 总结驱动的知识归档方法",
+            category = "知识管理",
+            keywords = listOf("摘要", "结构化", "检索", "归档"),
+            createdAt = now.minusHours(2),
+            outline = listOf(
+                OutlineNode(
+                    heading = "问题与目标",
+                    points = listOf("碎片化输入难以长期复用", "需要可检索的结构化内容"),
+                ),
+                OutlineNode(
+                    heading = "核心流程",
+                    points = listOf("输入 → 理解 → 组织 → 生成文章"),
+                    children = listOf(
+                        OutlineNode(
+                            heading = "输入层",
+                            points = listOf("链接、文本、图片", "保留原始来源"),
+                        ),
+                        OutlineNode(
+                            heading = "输出层",
+                            points = listOf("标题、关键词、大纲、思维导图"),
+                        ),
+                    ),
+                ),
+                OutlineNode(
+                    heading = "落地建议",
+                    points = listOf("先做文本输入 MVP", "逐步完善导入导出"),
+                ),
+            ),
+            mindmap = MindmapNode(
+                text = "知识归档",
+                children = listOf(
+                    MindmapNode(
+                        text = "输入",
+                        children = listOf(
+                            MindmapNode(text = "链接"),
+                            MindmapNode(text = "文本"),
+                            MindmapNode(text = "图片"),
+                        ),
+                    ),
+                    MindmapNode(
+                        text = "AI 处理",
+                        children = listOf(
+                            MindmapNode(text = "提炼主题"),
+                            MindmapNode(text = "组织结构"),
+                            MindmapNode(text = "生成摘要"),
+                        ),
+                    ),
+                    MindmapNode(
+                        text = "归档输出",
+                        children = listOf(
+                            MindmapNode(text = "文章"),
+                            MindmapNode(text = "标签/分类"),
+                        ),
+                    ),
+                ),
+            ),
+            sources = listOf(
+                SourceItem(
+                    type = "链接",
+                    title = "原始网页",
+                    body = "https://example.com/knowledge-archive",
+                    meta = "抓取时间：今天 10:20",
+                ),
+                SourceItem(
+                    type = "文本",
+                    title = "粘贴文本",
+                    body = "整理知识的关键在于保留来源，形成可复用的文章结构。",
+                ),
+                SourceItem(
+                    type = "图片",
+                    title = "会议白板照片",
+                    body = "已生成图片描述：白板包含三步流程与重点标注。",
+                    meta = "OCR：未开启",
+                ),
+            ),
+        ),
+        Article(
+            id = "a2",
+            title = "产品复盘：如何减少信息噪音",
+            category = "产品思考",
+            keywords = listOf("复盘", "信号", "流程", "决策"),
+            createdAt = now.minusDays(1),
+            outline = listOf(
+                OutlineNode(
+                    heading = "复盘背景",
+                    points = listOf("信息过载导致决策延迟", "团队需要共识"),
+                ),
+                OutlineNode(
+                    heading = "三步流程",
+                    points = listOf("收集事实", "过滤噪音", "沉淀原则"),
+                ),
+                OutlineNode(
+                    heading = "实践建议",
+                    points = listOf("每周固定复盘", "成果进入知识库"),
+                ),
+            ),
+            mindmap = MindmapNode(
+                text = "信息噪音",
+                children = listOf(
+                    MindmapNode(text = "问题"),
+                    MindmapNode(text = "过滤策略"),
+                    MindmapNode(text = "复盘输出"),
+                ),
+            ),
+            sources = listOf(
+                SourceItem(
+                    type = "文本",
+                    title = "复盘记录",
+                    body = "本周新增需求较多，需要聚焦核心指标。",
+                ),
+                SourceItem(
+                    type = "链接",
+                    title = "参考资料",
+                    body = "https://example.com/product-review",
+                    meta = "抓取时间：昨天 18:20",
+                ),
+            ),
+        ),
+        Article(
+            id = "a3",
+            title = "读书笔记：系统化学习的三步",
+            category = "学习",
+            keywords = listOf("大纲", "知识库", "输出", "复盘"),
+            createdAt = now.minusDays(2),
+            outline = listOf(
+                OutlineNode(
+                    heading = "建立体系",
+                    points = listOf("定义学习目标", "拆解知识模块"),
+                ),
+                OutlineNode(
+                    heading = "高效输入",
+                    points = listOf("做笔记", "及时归档"),
+                ),
+                OutlineNode(
+                    heading = "输出复盘",
+                    points = listOf("总结文章", "形成长期记忆"),
+                ),
+            ),
+            mindmap = MindmapNode(
+                text = "系统化学习",
+                children = listOf(
+                    MindmapNode(text = "体系"),
+                    MindmapNode(text = "输入"),
+                    MindmapNode(text = "输出"),
+                ),
+            ),
+            sources = listOf(
+                SourceItem(
+                    type = "文本",
+                    title = "书籍摘要",
+                    body = "系统化学习强调从目标出发，持续输出。",
+                ),
+            ),
+        ),
+    )
+}
+
+private fun buildTitle(input: NewEntryInput): String {
+    val trimmed = input.content.trim()
+    return when (input.type) {
+        InputType.Text -> trimmed.lineSequence().firstOrNull()?.take(26)?.ifBlank { "文本摘要" }
+            ?: "文本摘要"
+        InputType.Link -> "链接归档"
+        InputType.Image -> "图片归档"
+    }
+}
+
+private fun buildKeywords(input: NewEntryInput): List<String> {
+    val base = listOf("摘要", "结构化", "归档")
+    return when (input.type) {
+        InputType.Text -> base + listOf("文本", input.summaryLength)
+        InputType.Link -> base + listOf("链接", "来源")
+        InputType.Image -> base + listOf("图片", if (input.ocrEnabled) "OCR" else "描述")
+    }
+}
+
+private fun buildOutline(input: NewEntryInput): List<OutlineNode> {
+    return when (input.type) {
+        InputType.Text -> {
+            val highlights = extractHighlights(input.content)
+            listOf(
+                OutlineNode(
+                    heading = "核心要点",
+                    points = if (highlights.isNotEmpty()) highlights else listOf("已根据文本生成摘要"),
+                ),
+                OutlineNode(
+                    heading = "结构建议",
+                    points = listOf("保留原文语境", "按主题组织段落"),
+                ),
+            )
+        }
+        InputType.Link -> listOf(
+            OutlineNode(
+                heading = "抓取与清洗",
+                points = listOf("提取正文", "保留标题与发布时间"),
+            ),
+            OutlineNode(
+                heading = "内容理解",
+                points = listOf("聚合要点", "生成摘要与关键词"),
+            ),
+        )
+        InputType.Image -> listOf(
+            OutlineNode(
+                heading = "图片处理",
+                points = listOf("生成图片描述", "保留原图引用"),
+            ),
+            OutlineNode(
+                heading = "文字提取",
+                points = listOf(if (input.ocrEnabled) "已执行 OCR" else "可选 OCR 提取"),
+            ),
+        )
+    }
+}
+
+private fun buildMindmap(input: NewEntryInput): MindmapNode {
+    return MindmapNode(
+        text = buildTitle(input),
+        children = listOf(
+            MindmapNode(text = "输入"),
+            MindmapNode(text = "摘要"),
+            MindmapNode(text = "归档"),
+        ),
+    )
+}
+
+private fun buildSources(input: NewEntryInput): List<SourceItem> {
+    val meta = "语言：${input.language} · 摘要长度：${input.summaryLength}"
+    return when (input.type) {
+        InputType.Text -> listOf(
+            SourceItem(
+                type = "文本",
+                title = "原始文本",
+                body = input.content.take(180),
+                meta = meta,
+            ),
+        )
+        InputType.Link -> listOf(
+            SourceItem(
+                type = "链接",
+                title = "输入链接",
+                body = input.content,
+                meta = meta,
+            ),
+        )
+        InputType.Image -> listOf(
+            SourceItem(
+                type = "图片",
+                title = "图片输入",
+                body = "共 ${input.imageCount} 张图片",
+                meta = if (input.ocrEnabled) "$meta · OCR 已开启" else "$meta · OCR 未开启",
+            ),
+        )
+    }
+}
+
+private fun extractHighlights(content: String): List<String> {
+    return content
+        .replace("\r", "")
+        .split("\n")
+        .flatMap { line -> line.split("。", "！", "？") }
+        .map { it.trim() }
+        .filter { it.length >= 6 }
+        .distinct()
+        .take(3)
+}
+
+private fun formatTime(time: LocalDateTime): String {
+    val today = LocalDate.now()
+    val date = time.toLocalDate()
+    val timeText = time.format(DateTimeFormatter.ofPattern("HH:mm"))
+    return when (date) {
+        today -> "今天 · $timeText"
+        today.minusDays(1) -> "昨天 · $timeText"
+        else -> time.format(DateTimeFormatter.ofPattern("yyyy/MM/dd · HH:mm"))
+    }
 }
